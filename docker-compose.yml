@@ -1,0 +1,117 @@
+version: "3"
+
+services:
+
+  jupyter:
+    image: guizmo38/jupyter-training:1.0
+    container_name: 'jupyter'
+    ports:
+      - "8888:8888"
+      - "4040:4040"
+
+  mongo:
+    image: guizmo38/mongotraining
+    container_name: 'mongo'
+    ports:
+      - "27017:27017"
+
+  redis:
+    image: redis
+    container_name: 'redis'
+    ports:
+      - "6379:6379"
+  
+  neo4j:
+    image: neo4j
+    container_name: 'neo4j'
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    restart: always
+    ports:
+      - 9870:9870
+      - 9010:9000
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    env_file:
+      - ./hadoop.env
+
+  datanode1:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode1
+    restart: always
+    volumes:
+      - hadoop_datanode1:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+    ports:
+      - "9864:9864"
+    env_file:
+      - ./hadoop.env
+
+  datanode2:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode2
+    restart: always
+    volumes:
+      - hadoop_datanode2:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+    ports:
+      - "9865:9864"
+    env_file:
+      - ./hadoop.env
+
+  smaster:
+    image: guizmo38/spark-master:3.2.1-hadoop3.2-python3.7
+    container_name: smaster
+    depends_on:
+      - namenode
+      - datanode1
+      - datanode2
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      - INIT_DAEMON_STEP=setup_spark
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+
+  sworker1:
+    image: guizmo38/spark-worker:3.2.1-hadoop3.2-python3.7
+    container_name: sworker1
+    depends_on:
+      - smaster
+    ports:
+      - "8081:8081"
+    environment:
+      - "SPARK_MASTER=spark://smaster:7077"
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - "SPARK_WORKER_CORES=1"
+      - "SPARK_WORKER_MEMORY=1024m"
+
+  sworker2:
+    image: guizmo38/spark-worker:3.2.1-hadoop3.2-python3.7
+    container_name: sworker2
+    depends_on:
+      - smaster
+    ports:
+      - "8082:8081"
+    environment:
+      - "SPARK_MASTER=spark://smaster:7077"
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - "SPARK_WORKER_CORES=1"
+      - "SPARK_WORKER_MEMORY=1024m"
+
+volumes:
+  hadoop_namenode:
+  hadoop_datanode1:
+  hadoop_datanode2:
